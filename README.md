@@ -8,8 +8,8 @@ No command line required, making yt-dlp usable anytime, anywhere.
 ## ✨ 核心特性 (Features)
 
 - **原生 MTProto 协议**：基于 Pyrogram 框架开发，彻底突破 HTTP Bot API 的 50MB 上传限制，支持最高 2GB 的大文件直传。
-- **实时进度反馈**：拥有极其顺滑的 UI 体验，提供精确到字节和毫秒的**下载与上传双向实时进度条**。
-- **模块化架构**：核心交互逻辑与下载模块完全解耦，当前内置 X (Twitter) 平台支持，开发者可极其容易地横向扩展 YouTube、Instagram 等其他平台。
+- **实时进度反馈**：拥有顺滑的 UI 体验，提供精确的**下载与上传双向实时进度条**。
+- **模块化架构**：核心交互逻辑与下载模块完全解耦，当前内置 X (Twitter) 平台支持，开发者可自行地横向扩展 YouTube、Instagram 等其他平台。
 - **统一配置管理**：使用 YAML 文件统一管理密钥与系统路径，避免代码层面的硬编码，安全性高。
 - **按需选择格式**：提供“高兼容压缩视频”与“无损原画质文件”两种接收选项，满足不同场景需求。
 
@@ -79,7 +79,7 @@ python main.py
 
 ---
 
-## ⚙️ 守护进程配置 (Systemd Daemon) - 推荐 (以 Debian 为例)
+## ⚙️ 守护进程配置 (Systemd Daemon) - 推荐
 
 为了让机器人能在后台稳定运行并在崩溃后自动重启，建议使用 systemd 进行管理。
 
