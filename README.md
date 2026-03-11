@@ -27,7 +27,7 @@ No command line required, making yt-dlp usable anytime, anywhere.
 
 ### 1. 获取代码
 ```bash
-git clone [https://github.com/你的用户名/yt-dlp-telegramBot.git](https://github.com/你的用户名/yt-dlp-telegramBot.git)
+git clone https://github.com/Yppup/yt-dlp-telegramBot.git
 cd yt-dlp-telegramBot
 ```
 
@@ -50,12 +50,12 @@ TELEGRAM:
   BOT_TOKEN: "你的BOT_TOKEN"
 
 SYSTEM:
-  WORK_DIR: "/opt/xbot" # 机器人的绝对工作路径
-  X_COOKIE_FILE: "Xcookies.txt" # X (Twitter) 的 Cookie 文件名
+  WORK_DIR: "YOUR_WORK_DIR" # 机器人的绝对工作路径
+  X_COOKIE_FILE: "YOUR_X_COOKIE_FILE.txt" # X (Twitter) 的 Cookie 文件名
 ```
 
 ### 4. 准备 Cookie 文件 (可选但推荐)
-为了能够正常下载部分限制级（NSFW）或需要登录才能查看的内容，请通过浏览器插件（如 Get cookies.txt LOCALLY）导出目标平台的 Cookie，并命名为 `Xcookies.txt`（与配置一致），放置在工作目录中。
+为了能够正常下载部分限制级（NSFW）或需要登录才能查看的内容，请通过浏览器插件（如 Get cookies.txt LOCALLY）导出目标平台的 Cookie，并命名为 `YOUR_X_COOKIE_FILE.txt`（与配置一致），放置在工作目录中。
 
 ### 5. 启动机器人
 测试运行：
@@ -66,11 +66,11 @@ python main.py
 
 ---
 
-## ⚙️ 守护进程配置 (Systemd Daemon) - 推荐
+## ⚙️ 守护进程配置 (Systemd Daemon) - 推荐 (以 Debian 为例)
 
 为了让机器人能在后台稳定运行并在崩溃后自动重启，建议使用 systemd 进行管理。
 
-1. 创建服务文件：`sudo nano /etc/systemd/system/xbot.service`
+1. 创建服务文件：`sudo nano /etc/systemd/system/bot.service`
 2. 填入以下配置（注意修改路径匹配你的实际环境）：
 ```ini
 [Unit]
@@ -79,8 +79,8 @@ After=network.target
 
 [Service]
 User=root
-WorkingDirectory=/opt/xbot
-ExecStart=/opt/xbot/bot_env/bin/python main.py
+WorkingDirectory=/your/work/dir
+ExecStart=/your/work/dir/bot_env/bin/python main.py
 Restart=always
 RestartSec=5
 
@@ -90,16 +90,9 @@ WantedBy=multi-user.target
 3. 启动并设置开机自启：
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable xbot
-sudo systemctl start xbot
+sudo systemctl enable bot
+sudo systemctl start bot
 ```
-
-## 📂 扩展开发 (Extension)
-
-得益于良好的模块化设计，想要增加新平台（如 YouTube）的支持，只需：
-1. 参照 `x_downloader.py` 创建 `youtube_downloader.py`。
-2. 在 `main.py` 的 `handle_message` 方法中增加针对 YouTube 链接的正则是非判断。
-3. 动态调用对应的下载器并传入 `active_downloads` 字典即可。
 
 ## 📄 开源协议 (License)
 本项目基于 [MIT License](LICENSE) 协议开源。
