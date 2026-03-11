@@ -1,2 +1,106 @@
-# yt-dlp-telegramBot
-  No command line required, making yt-dlp usable anytime, anywhere.
+# yt-dlp-telegramBot 🤖
+
+No command line required, making yt-dlp usable anytime, anywhere.
+
+基于 Pyrogram 和 yt-dlp 开发的 Telegram 媒体下载机器人。
+无需掌握任何命令行知识，只需向机器人发送链接，即可随时随地将最高画质的流媒体视频直接转存至 Telegram。
+
+## ✨ 核心特性 (Features)
+
+- **原生 MTProto 协议**：基于 Pyrogram 框架开发，彻底突破 HTTP Bot API 的 50MB 上传限制，支持最高 2GB 的大文件直传。
+- **实时进度反馈**：拥有极其顺滑的 UI 体验，提供精确到字节和毫秒的**下载与上传双向实时进度条**。
+- **模块化架构**：核心交互逻辑与下载模块完全解耦，当前内置 X (Twitter) 平台支持，开发者可极其容易地横向扩展 YouTube、Instagram 等其他平台。
+- **统一配置管理**：使用 YAML 文件统一管理密钥与系统路径，避免代码层面的硬编码，安全性高。
+- **按需选择格式**：提供“高兼容压缩视频”与“无损原画质文件”两种接收选项，满足不同场景需求。
+
+## 🛠️ 环境依赖 (Prerequisites)
+
+在开始部署之前，请确保你的服务器已安装以下基础环境：
+- **Python 3.8+**
+- **FFmpeg**：`yt-dlp` 合并超清音视频流的必备系统级依赖。
+  - Ubuntu/Debian: `sudo apt install ffmpeg`
+  - CentOS/RHEL: `sudo yum install ffmpeg`
+- **Telegram 开发者密钥**：前往 [my.telegram.org](https://my.telegram.org/) 获取 `API_ID` 和 `API_HASH`。
+- **Bot Token**：向 Telegram 中的 [@BotFather](https://t.me/BotFather) 申请并获取。
+
+## 🚀 部署指南 (Installation & Setup)
+
+### 1. 获取代码
+```bash
+git clone [https://github.com/你的用户名/yt-dlp-telegramBot.git](https://github.com/你的用户名/yt-dlp-telegramBot.git)
+cd yt-dlp-telegramBot
+```
+
+### 2. 配置 Python 虚拟环境与依赖
+推荐使用虚拟环境以隔离依赖：
+```bash
+python3 -m venv bot_env
+source bot_env/bin/activate
+pip install pyrogram tgcrypto yt-dlp pyyaml
+```
+*(注：`tgcrypto` 是 Pyrogram 推荐的底层加密库，可大幅提升上传/下载速度。)*
+
+### 3. 修改配置文件
+编辑项目根目录下的 `config.yaml` 文件，填入你的专属配置：
+
+```yaml
+TELEGRAM:
+  API_ID: 1234567 # 替换为你的 API ID (纯数字)
+  API_HASH: "你的API_HASH"
+  BOT_TOKEN: "你的BOT_TOKEN"
+
+SYSTEM:
+  WORK_DIR: "/opt/xbot" # 机器人的绝对工作路径
+  X_COOKIE_FILE: "Xcookies.txt" # X (Twitter) 的 Cookie 文件名
+```
+
+### 4. 准备 Cookie 文件 (可选但推荐)
+为了能够正常下载部分限制级（NSFW）或需要登录才能查看的内容，请通过浏览器插件（如 Get cookies.txt LOCALLY）导出目标平台的 Cookie，并命名为 `Xcookies.txt`（与配置一致），放置在工作目录中。
+
+### 5. 启动机器人
+测试运行：
+```bash
+python main.py
+```
+如果终端输出 `Main Pyrogram Bot is starting...`，即可前往 Telegram 向你的机器人发送推文链接进行测试。
+
+---
+
+## ⚙️ 守护进程配置 (Systemd Daemon) - 推荐
+
+为了让机器人能在后台稳定运行并在崩溃后自动重启，建议使用 systemd 进行管理。
+
+1. 创建服务文件：`sudo nano /etc/systemd/system/xbot.service`
+2. 填入以下配置（注意修改路径匹配你的实际环境）：
+```ini
+[Unit]
+Description=Telegram yt-dlp Bot Service
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/opt/xbot
+ExecStart=/opt/xbot/bot_env/bin/python main.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+3. 启动并设置开机自启：
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable xbot
+sudo systemctl start xbot
+```
+
+## 📂 扩展开发 (Extension)
+
+得益于良好的模块化设计，想要增加新平台（如 YouTube）的支持，只需：
+1. 参照 `x_downloader.py` 创建 `youtube_downloader.py`。
+2. 在 `main.py` 的 `handle_message` 方法中增加针对 YouTube 链接的正则是非判断。
+3. 动态调用对应的下载器并传入 `active_downloads` 字典即可。
+
+## 📄 开源协议 (License)
+本项目基于 [MIT License](LICENSE) 协议开源。
+
