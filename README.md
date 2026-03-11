@@ -31,16 +31,29 @@ git clone https://github.com/Yppup/yt-dlp-telegramBot.git
 cd yt-dlp-telegramBot
 ```
 
-### 2. 配置 Python 虚拟环境与依赖
-推荐使用虚拟环境以隔离依赖：
+### 2. 安装系统级依赖
+对于 Debian/Ubuntu 等系统，推荐将基础工具作为系统全局依赖安装，避免环境冲突：
+```bash
+# 安装 FFmpeg 和全局 YAML 库
+
+sudo apt update
+sudo apt install ffmpeg python3-yaml -y
+
+# 下载 yt-dlp 独立二进制文件（推荐方式，方便后续使用 yt-dlp -U 全局更新）
+sudo wget https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -O ~/.local/bin/yt-dlp
+sudo chmod a+rx ~/.local/bin/yt-dlp  # Make executable
+```
+
+### 3. 配置 Python 虚拟环境 (仅安装核心框架)
+为了隔离环境并符合现代 Linux 系统的 PEP 668 规范，我们仅在虚拟环境中安装 Telegram 通信框架：
 ```bash
 python3 -m venv bot_env
 source bot_env/bin/activate
-pip install pyrogram tgcrypto yt-dlp pyyaml
+pip install pyrogram tgcrypto
 ```
 *(注：`tgcrypto` 是 Pyrogram 推荐的底层加密库，可大幅提升上传/下载速度。)*
 
-### 3. 修改配置文件
+### 4. 修改配置文件
 编辑项目根目录下的 `config.yaml` 文件，填入你的专属配置：
 
 ```yaml
@@ -54,10 +67,10 @@ SYSTEM:
   X_COOKIE_FILE: "YOUR_X_COOKIE_FILE.txt" # X (Twitter) 的 Cookie 文件名
 ```
 
-### 4. 准备 Cookie 文件 (可选但推荐)
+### 5. 准备 Cookie 文件 (可选但推荐)
 为了能够正常下载部分限制级（NSFW）或需要登录才能查看的内容，请通过浏览器插件（如 Get cookies.txt LOCALLY）导出目标平台的 Cookie，并命名为 `YOUR_X_COOKIE_FILE.txt`（与配置一致），放置在工作目录中。
 
-### 5. 启动机器人
+### 6. 启动机器人
 测试运行：
 ```bash
 python main.py
