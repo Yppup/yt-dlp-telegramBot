@@ -26,30 +26,30 @@ No command line required, making yt-dlp usable anytime, anywhere.
 ## 🚀 部署指南 (Installation & Setup)
 
 ### 1. 获取代码
+
 ```bash
 git clone https://github.com/Yppup/yt-dlp-telegramBot.git
 cd yt-dlp-telegramBot
 ```
 
 ### 2. 安装系统级依赖
-对于 Debian/Ubuntu 等系统，推荐将基础工具作为系统全局依赖安装，避免环境冲突：
+
+推荐将FFmpeg作为系统全局依赖安装，避免环境冲突：
+
 ```bash
-# 安装 FFmpeg 和全局 YAML 库
-
-sudo apt update
-sudo apt install ffmpeg python3-yaml -y
-
-# 下载 yt-dlp 独立二进制文件（推荐方式，方便后续使用 yt-dlp -U 全局更新）
-sudo wget https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -O ~/.local/bin/yt-dlp
-sudo chmod a+rx ~/.local/bin/yt-dlp  # Make executable
+# 安装 FFmpeg
+apt update
+apt install ffmpeg
 ```
 
-### 3. 配置 Python 虚拟环境 (仅安装核心框架)
-为了隔离环境并符合现代 Linux 系统的 PEP 668 规范，我们仅在虚拟环境中安装 Telegram 通信框架：
+### 3. 配置 Python 虚拟环境
+
+为了隔离环境并符合现代 Linux 系统的 PEP 668 规范，我们仅在虚拟环境中安装其余依赖
+：
 ```bash
 python3 -m venv bot_env
 source bot_env/bin/activate
-pip install pyrogram tgcrypto
+pip install pyrogram tgcrypto pyyaml yt-dlp
 ```
 *(注：`tgcrypto` 是 Pyrogram 推荐的底层加密库，可大幅提升上传/下载速度。)*
 
@@ -83,7 +83,7 @@ python main.py
 
 为了让机器人能在后台稳定运行并在崩溃后自动重启，建议使用 systemd 进行管理。
 
-1. 创建服务文件：`sudo nano /etc/systemd/system/bot.service`
+1. 创建服务文件：`nano /etc/systemd/system/bot.service`
 2. 填入以下配置（注意修改路径匹配你的实际环境）：
 ```ini
 [Unit]
@@ -102,9 +102,9 @@ WantedBy=multi-user.target
 ```
 3. 启动并设置开机自启：
 ```bash
-sudo systemctl daemon-reload
-sudo systemctl enable bot
-sudo systemctl start bot
+systemctl daemon-reload
+systemctl enable bot
+systemctl start bot
 ```
 
 ## 📄 开源协议 (License)

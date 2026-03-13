@@ -1,5 +1,9 @@
 # .gitignore
 
+LICENSE
+*.txt
+config.yaml
+
 *.session
 *.session-journal
 
