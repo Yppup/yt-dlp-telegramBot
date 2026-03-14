@@ -8,8 +8,8 @@ import yt_dlp
 with open("config.yaml", "r", encoding="utf-8") as f:
     config = yaml.safe_load(f)
 
-WORK_DIR = config['SYSTEM']['WORK_DIR']
-X_COOKIE_PATH = os.path.join(WORK_DIR, config['SYSTEM']['X_COOKIE_FILE'])
+WORK_DIR = config['SYSTEM'].get('WORK_DIR','./')
+COOKIE_PATH = os.path.join(WORK_DIR, config['SYSTEM'].get('COOKIE_FILE','cookies.txt'))
 
 def download_video_sync(url: str, file_prefix_path: str, msg_id: int, active_downloads: dict):
     """
@@ -33,7 +33,7 @@ def download_video_sync(url: str, file_prefix_path: str, msg_id: int, active_dow
         'merge_output_format': 'mp4',
         'quiet': True,
         'no_warnings': True,
-        'cookiefile': X_COOKIE_PATH, 
+        'cookiefile': COOKIE_PATH, 
         'progress_hooks': [progress_hook],
     }
     
