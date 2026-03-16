@@ -8,7 +8,7 @@ from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.errors import MessageNotModified
 
-from x_downloader import download_video_sync
+from video_downloader import download_video_sync
 
 # --- 将配置文件中的 Token 动态转写为 yt-dlp 可识别的 Netscape 格式 ---
 def generate_unified_cookie_file(config):
@@ -139,13 +139,18 @@ async def upload_progress(current, total, message, start_time, state):
 # --- 消息拦截与按钮 ---
 @app.on_message(filters.text & ~filters.command("start"))
 async def handle_message(client, message):
-    url_match = re.search(r'(https?://(?:www\.)?(?:twitter\.com|x\.com)/[^\s]+)', message.text)
+    # 匹配 X 和 Instagram 链接
+    url_match = re.search(r'(https?://(?:www\.)?(?:twitter\.com|x\.com|instagram\.com)/[^\s]+)', message.text)
     if not url_match:
         return
         
-    url = url_match.group(1)
+    raw_url = url_match.group(1)
+    
+    # 直接截断问号及后面的所有跟踪参数（如 ?s=46 或 ?igsh=...）
+    clean_url = raw_url.split('?')[0] 
+    
     msg_id = message.id
-    url_cache[msg_id] = url
+    url_cache[msg_id] = clean_url  # 存入缓存的是“干净”的链接
     
     keyboard = InlineKeyboardMarkup([
         [
@@ -168,10 +173,15 @@ async def button_callback(client, query):
         await query.message.edit_text("❌ 链接已过期或丢失，请重新发送。")
         return
 
-    post_id_match = re.search(r'status/(\d+)', url)
-    post_id = post_id_match.group(1) if post_id_match else str(original_msg_id)
+    if 'instagram.com' in url:
+        ig_match = re.search(r'(?:reel|p)/([^/]+)', url)
+        post_id = ig_match.group(1) if ig_match else str(original_msg_id)
+        file_prefix_path = os.path.join(WORK_DIR, f"ig_video_{post_id}")
+    else:
+        post_id_match = re.search(r'status/(\d+)', url)
+        post_id = post_id_match.group(1) if post_id_match else str(original_msg_id)
+        file_prefix_path = os.path.join(WORK_DIR, f"x_video_{post_id}")
     
-    file_prefix_path = os.path.join(WORK_DIR, f"x_video_{post_id}")
     expected_file_name = f"{file_prefix_path}.mp4"
     
     active_downloads[original_msg_id] = "初始化中..."
