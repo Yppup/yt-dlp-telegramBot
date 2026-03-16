@@ -13,7 +13,7 @@ COOKIE_PATH = os.path.join(WORK_DIR, config['SYSTEM'].get('COOKIE_FILE','cookies
 
 def download_video_sync(url: str, file_prefix_path: str, msg_id: int, active_downloads: dict):
     """
-    独立的 X (Twitter) 视频下载模块
+    独立的视频下载模块
     """
     def progress_hook(d):
         if d['status'] == 'downloading':

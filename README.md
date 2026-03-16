@@ -7,19 +7,19 @@ No command line required, making yt-dlp usable anytime, anywhere.
 
 ## ✨ 核心特性 (Features)
 
-- **原生 MTProto 协议**：基于 Pyrogram 框架开发，彻底突破 HTTP Bot API 的 50MB 上传限制，支持最高 2GB 的大文件直传。
-- **实时进度反馈**：拥有顺滑的 UI 体验，提供精确的**下载与上传双向实时进度条**。
-- **模块化架构**：核心交互逻辑与下载模块完全解耦，当前内置 X (Twitter) 平台支持，开发者可自行地横向扩展 YouTube、Instagram 等其他平台。
-- **统一配置管理**：使用 YAML 文件统一管理密钥与系统路径，避免代码层面的硬编码，安全性高。
+- **原生 MTProto 协议**：基于 Pyrogram 框架开发，无视 HTTP Bot API 的 50MB 上传限制，支持最高 2GB 的大文件直传。
+- **实时进度反馈**：下载与上传进度会在对话框中实时更新。
+- **独立的视频下载模块**：交互逻辑与下载模块解耦，开发者可快速扩展其他 `yt-dlp` 支持的平台。
+- **统一配置管理**：使用 YAML 文件统一管理 API 与 Cookie 等敏感数据，避免代码层面的硬编码。
 - **按需选择格式**：提供“高兼容压缩视频”与“无损原画质文件”两种接收选项，满足不同场景需求。
 
 ## 🛠️ 环境依赖 (Prerequisites)
 
 在开始部署之前，请确保你的服务器已安装以下基础环境：
 - **Python 3.8+**
-- **FFmpeg**：`yt-dlp` 合并超清音视频流的必备系统级依赖。
-  - Ubuntu/Debian: `sudo apt install ffmpeg`
-  - CentOS/RHEL: `sudo yum install ffmpeg`
+- **FFmpeg**：`yt-dlp` 合并音视频流的依赖。
+  - Ubuntu/Debian: `apt install ffmpeg`
+  - CentOS/RHEL: `yum install ffmpeg`
 - **Telegram 开发者密钥**：前往 [my.telegram.org](https://my.telegram.org/) 获取 `API_ID` 和 `API_HASH`。
 - **Bot Token**：向 Telegram 中的 [@BotFather](https://t.me/BotFather) 申请并获取。
 
@@ -54,21 +54,29 @@ pip install pyrogram tgcrypto pyyaml yt-dlp
 *(注：`tgcrypto` 是 Pyrogram 推荐的底层加密库，可大幅提升上传/下载速度。)*
 
 ### 4. 修改配置文件
-编辑项目根目录下的 `config.yaml` 文件，填入你的专属配置：
+编辑项目根目录下的 `config.yaml` 文件，填入你的配置：
 
 ```yaml
 TELEGRAM:
-  API_ID: 1234567 # 替换为你的 API ID (纯数字)
-  API_HASH: "你的API_HASH"
-  BOT_TOKEN: "你的BOT_TOKEN"
+  API_ID: 123456 # API ID 为纯数字
+  API_HASH: "YOUR_API_HASH_HERE"
+  BOT_TOKEN: "YOUR_BOT_TOKEN_HERE"
 
 SYSTEM:
-  WORK_DIR: "YOUR_WORK_DIR" # 机器人的绝对工作路径
-  X_COOKIE_FILE: "YOUR_X_COOKIE_FILE.txt" # X (Twitter) 的 Cookie 文件名
+  WORK_DIR: "YOUR_WORK_DIR_HERE" # Bot 的工作路径
+  COOKIE_FILE: "YOUR_COOKIE_FILE_NAME_HERE" # Cookie 文件名
+
+# 以下为可选内容
+TOKENS: 
+  X_AUTH_TOKEN: "YOUR_X_AUTH_TOKEN_HERE"
+  X_CT0: "YOUR_X_CT0_HERE"
+
+  INS_SESSIONID: "YOUR_INSTAGRAM_SESSIONID_HERE"
+  INS_CSRFTOKEN: "YOUR_INS_CSRFTOKEN_HERE"
 ```
 
-### 5. 准备 Cookie 文件 (可选但推荐)
-为了能够正常下载部分限制级（NSFW）或需要登录才能查看的内容，请通过浏览器插件（如 Get cookies.txt LOCALLY）导出目标平台的 Cookie，并命名为 `YOUR_X_COOKIE_FILE.txt`（与配置一致），放置在工作目录中。
+### 5. 准备 Cookie (可选但推荐)
+为了能够正常下载部分限制级（NSFW）或需要登录才能查看的内容，请自行获取目标平台的 Cookie 填入配置文件的 Token 栏目中。
 
 ### 6. 启动机器人
 测试运行：
