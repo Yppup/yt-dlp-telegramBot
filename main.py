@@ -4,6 +4,7 @@ import re
 import time
 import asyncio
 import yaml
+import json
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.errors import MessageNotModified
@@ -136,6 +137,25 @@ async def upload_progress(current, total, message, start_time, state):
         except Exception:
             pass
 
+async def video_codec(file_path):
+    """使用 ffprobe 检查视频文件的编码格式"""
+    cmd = [
+        'ffprobe', '-v', 'error', '-select_streams', 'v:0',
+        '-show_entries', 'stream=codec_name', '-of', 'json', file_path
+    ]
+    try:
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, _ = await process.communicate()
+        info = json.loads(stdout)
+        return info['streams'][0]['codec_name'].lower()
+    except Exception as e:
+        print(f"检查编码失败: {e}")
+        return ""
+
 # --- 消息拦截与按钮 ---
 @app.on_message(filters.text & ~filters.command("start"))
 async def handle_message(client, message):
@@ -152,13 +172,21 @@ async def handle_message(client, message):
     msg_id = message.id
     url_cache[msg_id] = clean_url  # 存入缓存的是“干净”的链接
     
+    reply_text = (
+        "👇 **成功解析，请选择接收方式：**\n\n"
+        "🎬 **视频模式**：可直接预览或保存到相册（VP9 或 AV1 编码会自动触发转码）。\n"
+        "📄 **文件模式**：不会损失画质，不触发转码（不支持的编码需要使用第三方播放器）。"
+    )
+
     keyboard = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("🎬 视频 (压缩/兼容好)", callback_data=f"video_{msg_id}"),
-            InlineKeyboardButton("📄 文件 (无损/原画质)", callback_data=f"doc_{msg_id}")
+            InlineKeyboardButton("🎬 视频模式", callback_data=f"video_{msg_id}"),
+        ],
+        [
+            InlineKeyboardButton("📄 文件模式", callback_data=f"doc_{msg_id}")
         ]
     ])
-    await message.reply_text('👇 成功解析，请选择接收方式：', reply_markup=keyboard, reply_to_message_id=msg_id)
+    await message.reply_text(reply_text, reply_markup=keyboard, reply_to_message_id=msg_id)
 
 @app.on_callback_query()
 async def button_callback(client, query):
@@ -197,6 +225,39 @@ async def button_callback(client, query):
         
         if not os.path.exists(expected_file_name):
             raise Exception("yt-dlp 下载完成，但硬盘未找到文件。")
+
+        if mode == 'video':
+            codec = await video_codec(expected_file_name)
+            
+            # 如果查出是 Telegram 不支持的 vp9 或 av1 (YouTube 常用)
+            if codec in ['vp9', 'vp09', 'av1', 'av01']:
+                await query.message.edit_text("⚙️ 检测到不受支持的视频编码 (VP9/AV1)\n正在自动转码为 H.264，这可能需要几分钟，请耐心等待...")
+                
+                transcoded_file = f"{file_prefix_path}_h264.mp4"
+                
+                # 呼叫 FFmpeg 进行转码
+                ffmpeg_cmd = [
+                    'ffmpeg', '-y', '-i', expected_file_name,
+                    '-c:v', 'libx264', 
+                    '-preset', 'veryslow',
+                    '-crf', '22',
+                    '-c:a', 'aac',
+                    '-b:a', '320k',
+                    transcoded_file
+                ]
+                
+                process = await asyncio.create_subprocess_exec(
+                    *ffmpeg_cmd,
+                    stdout=asyncio.subprocess.DEVNULL, # 隐藏控制台的刷屏日志
+                    stderr=asyncio.subprocess.DEVNULL
+                )
+                await process.wait() # 等待转码完成
+                
+                if process.returncode == 0 and os.path.exists(transcoded_file):
+                    # 转码成功，把新文件覆盖掉旧文件
+                    os.replace(transcoded_file, expected_file_name)
+                else:
+                    raise Exception("FFmpeg 转码过程发生错误。")
 
         start_time = time.time()
         state = {"last_update": 0}
