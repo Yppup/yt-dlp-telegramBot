@@ -49,7 +49,7 @@ apt install ffmpeg
 ```bash
 python3 -m venv bot_env
 source bot_env/bin/activate
-pip install pyrogram tgcrypto pyyaml yt-dlp
+pip install pyrogram wheel tgcrypto pyyaml yt-dlp
 ```
 *(注：`tgcrypto` 是 Pyrogram 推荐的底层加密库，可大幅提升上传/下载速度。)*
 
