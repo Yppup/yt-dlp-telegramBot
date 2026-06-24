@@ -11,6 +11,9 @@ with open("config.yaml", "r", encoding="utf-8") as f:
 WORK_DIR = config['SYSTEM'].get('WORK_DIR','./')
 COOKIE_PATH = os.path.join(WORK_DIR, config['SYSTEM'].get('COOKIE_FILE','cookies.txt'))
 
+def _is_instagram_url(url):
+    return 'instagram.com' in url
+
 def _clean_ansi(value):
     return re.sub(r'\x1b\[[0-9;]*m', '', value or '').strip()
 
@@ -59,7 +62,12 @@ def download_video_sync(url: str, file_prefix_path: str, msg_id: int, active_dow
     if selection != 'all':
         selected_indexes = [int(selection)]
 
-    probe_entries = known_entries or probe_video_entries(url)
+    if known_entries:
+        probe_entries = known_entries
+    elif _is_instagram_url(url):
+        probe_entries = [{'index': 1, 'width': 0, 'height': 0, 'duration': 0}]
+    else:
+        probe_entries = probe_video_entries(url)
     total_count = len(probe_entries)
     if selected_indexes is None:
         selected_indexes = [entry['index'] for entry in probe_entries]

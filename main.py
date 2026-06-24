@@ -170,6 +170,9 @@ def build_file_prefix_path(url, original_msg_id):
     post_id = post_id_match.group(1) if post_id_match else str(original_msg_id)
     return os.path.join(WORK_DIR, f"x_video_{post_id}")
 
+def is_instagram_url(url):
+    return 'instagram.com' in url
+
 def build_entry_selection_keyboard(mode, original_msg_id, entry_count):
     rows = [[
         InlineKeyboardButton("全部下载", callback_data=f"pick_{mode}_{original_msg_id}_all")
@@ -353,6 +356,13 @@ async def button_callback(client, query):
         try:
             cached = entry_cache.get(original_msg_id, {})
             await process_download(client, query, mode, original_msg_id, url, selection, cached.get('entries'))
+        finally:
+            processing_callbacks.discard(original_msg_id)
+        return
+
+    if is_instagram_url(url):
+        try:
+            await process_download(client, query, mode, original_msg_id, url, 'all')
         finally:
             processing_callbacks.discard(original_msg_id)
         return
