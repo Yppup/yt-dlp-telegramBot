@@ -9,7 +9,7 @@ from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.errors import MessageNotModified
 
-from video_downloader import download_video_sync
+from video_downloader import download_video_sync, probe_video_entries
 
 # --- 将配置文件中的 Token 动态转写为 yt-dlp 可识别的 Netscape 格式 ---
 def generate_unified_cookie_file(config):
@@ -90,7 +90,9 @@ WORK_DIR = config['SYSTEM']['WORK_DIR']
 
 app = Client("xbot_session", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN, workdir=WORK_DIR)
 url_cache = {}
+entry_cache = {}
 active_downloads = {}
+processing_callbacks = set()
 generate_unified_cookie_file(config)
 
 # --- 进度条更新任务 ---
@@ -124,8 +126,10 @@ async def upload_progress(current, total, message, start_time, state):
         speed_mb = speed_bps / 1024 / 1024
         mins, secs = divmod(int(eta_seconds), 60)
         
+        item_text = f"📦 文件: {state['item']}\n" if state.get('item') else ""
         text = (
             f"⬆️ 正在直传至 Telegram:\n"
+            f"{item_text}"
             f"📊 进度: {percent:.1f}% ({current_mb:.1f} MB / {total_mb:.1f} MB)\n"
             f"🚀 速度: {speed_mb:.2f} MB/s\n"
             f"⏳ 剩余: {mins}分 {secs}秒"
@@ -155,6 +159,143 @@ async def video_codec(file_path):
     except Exception as e:
         print(f"检查编码失败: {e}")
         return ""
+
+def build_file_prefix_path(url, original_msg_id):
+    if 'instagram.com' in url:
+        ig_match = re.search(r'(?:reel|p)/([^/]+)', url)
+        post_id = ig_match.group(1) if ig_match else str(original_msg_id)
+        return os.path.join(WORK_DIR, f"ig_video_{post_id}")
+
+    post_id_match = re.search(r'status/(\d+)', url)
+    post_id = post_id_match.group(1) if post_id_match else str(original_msg_id)
+    return os.path.join(WORK_DIR, f"x_video_{post_id}")
+
+def is_instagram_url(url):
+    return 'instagram.com' in url
+
+def build_entry_selection_keyboard(mode, original_msg_id, entry_count):
+    rows = [[
+        InlineKeyboardButton("全部下载", callback_data=f"pick_{mode}_{original_msg_id}_all")
+    ]]
+
+    row = []
+    for index in range(1, entry_count + 1):
+        row.append(InlineKeyboardButton(f"第 {index} 个", callback_data=f"pick_{mode}_{original_msg_id}_{index}"))
+        if len(row) == 3:
+            rows.append(row)
+            row = []
+
+    if row:
+        rows.append(row)
+
+    return InlineKeyboardMarkup(rows)
+
+async def transcode_to_h264(message, file_path):
+    codec = await video_codec(file_path)
+    if codec not in ['vp9', 'vp09', 'av1', 'av01']:
+        return
+
+    await message.edit_text("⚙️ 检测到不受支持的视频编码 (VP9/AV1)\n正在自动转码为 H.264，这可能需要几分钟，请耐心等待...")
+
+    file_root, _ = os.path.splitext(file_path)
+    transcoded_file = f"{file_root}_h264.mp4"
+    ffmpeg_cmd = [
+        'ffmpeg', '-y', '-i', file_path,
+        '-c:v', 'libx264',
+        '-preset', 'veryslow',
+        '-crf', '22',
+        '-c:a', 'aac',
+        '-b:a', '320k',
+        transcoded_file
+    ]
+
+    process = await asyncio.create_subprocess_exec(
+        *ffmpeg_cmd,
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.DEVNULL
+    )
+    await process.wait()
+
+    if process.returncode == 0 and os.path.exists(transcoded_file):
+        os.replace(transcoded_file, file_path)
+    else:
+        if os.path.exists(transcoded_file):
+            os.remove(transcoded_file)
+        raise Exception("FFmpeg 转码过程发生错误。")
+
+async def process_download(client, query, mode, original_msg_id, url, selection, entries=None):
+    chat_id = query.message.chat.id
+    file_prefix_path = build_file_prefix_path(url, original_msg_id)
+    downloaded_paths = []
+    dl_task = None
+
+    active_downloads[original_msg_id] = "初始化中..."
+    dl_task = asyncio.create_task(update_download_ui(query.message, original_msg_id))
+
+    try:
+        video_results = await asyncio.to_thread(
+            download_video_sync, url, file_prefix_path, original_msg_id, active_downloads, selection, entries
+        )
+
+        active_downloads.pop(original_msg_id, None)
+        dl_task.cancel()
+
+        if not video_results:
+            raise Exception("yt-dlp 未返回任何下载结果。")
+
+        downloaded_paths = [video_metadata['path'] for video_metadata in video_results]
+        total_videos = len(video_results)
+        for ordinal, video_metadata in enumerate(video_results, start=1):
+            file_path = video_metadata['path']
+
+            if not os.path.exists(file_path):
+                raise Exception(f"yt-dlp 下载完成，但硬盘未找到文件: {os.path.basename(file_path)}")
+
+            if mode == 'video':
+                await transcode_to_h264(query.message, file_path)
+
+            start_time = time.time()
+            item_label = f"{ordinal}/{total_videos}" if total_videos > 1 else ""
+            state = {"last_update": 0, "item": item_label}
+            caption_suffix = f" ({ordinal}/{total_videos})" if total_videos > 1 else ""
+
+            if mode == 'video':
+                await client.send_video(
+                    chat_id=chat_id,
+                    video=file_path,
+                    reply_to_message_id=original_msg_id,
+                    caption=f"✅ Down! 请查收视频！{caption_suffix}",
+                    supports_streaming=True,
+                    width=video_metadata.get('width'),
+                    height=video_metadata.get('height'),
+                    duration=video_metadata.get('duration'),
+                    progress=upload_progress,
+                    progress_args=(query.message, start_time, state)
+                )
+            else:
+                await client.send_document(
+                    chat_id=chat_id,
+                    document=file_path,
+                    reply_to_message_id=original_msg_id,
+                    caption=f"✅ Down! 请查收文件！{caption_suffix}",
+                    progress=upload_progress,
+                    progress_args=(query.message, start_time, state)
+                )
+
+        await query.message.delete()
+
+    except Exception as e:
+        active_downloads.pop(original_msg_id, None)
+        if dl_task:
+            dl_task.cancel()
+        await query.message.edit_text(f"❌ 处理失败: {str(e)}")
+
+    finally:
+        url_cache.pop(original_msg_id, None)
+        entry_cache.pop(original_msg_id, None)
+        for file_path in downloaded_paths:
+            if os.path.exists(file_path):
+                os.remove(file_path)
 
 # --- 消息拦截与按钮 ---
 @app.on_message(filters.text & ~filters.command("start"))
@@ -191,9 +332,14 @@ async def handle_message(client, message):
 @app.on_callback_query()
 async def button_callback(client, query):
     data = query.data
-    chat_id = query.message.chat.id
-    
-    mode, msg_id_str = data.split('_')
+    parts = data.split('_')
+
+    if parts[0] == 'pick':
+        _, mode, msg_id_str, selection = parts
+    else:
+        mode, msg_id_str = parts
+        selection = None
+
     original_msg_id = int(msg_id_str)
     url = url_cache.get(original_msg_id)
     
@@ -201,101 +347,56 @@ async def button_callback(client, query):
         await query.message.edit_text("❌ 链接已过期或丢失，请重新发送。")
         return
 
-    if 'instagram.com' in url:
-        ig_match = re.search(r'(?:reel|p)/([^/]+)', url)
-        post_id = ig_match.group(1) if ig_match else str(original_msg_id)
-        file_prefix_path = os.path.join(WORK_DIR, f"ig_video_{post_id}")
-    else:
-        post_id_match = re.search(r'status/(\d+)', url)
-        post_id = post_id_match.group(1) if post_id_match else str(original_msg_id)
-        file_prefix_path = os.path.join(WORK_DIR, f"x_video_{post_id}")
-    
-    expected_file_name = f"{file_prefix_path}.mp4"
-    
-    active_downloads[original_msg_id] = "初始化中..."
-    dl_task = asyncio.create_task(update_download_ui(query.message, original_msg_id))
-    
+    if original_msg_id in processing_callbacks:
+        await query.answer("正在处理，请勿重复点击。", show_alert=False)
+        return
+
+    processing_callbacks.add(original_msg_id)
+    if selection is not None:
+        try:
+            cached = entry_cache.get(original_msg_id, {})
+            await process_download(client, query, mode, original_msg_id, url, selection, cached.get('entries'))
+        finally:
+            processing_callbacks.discard(original_msg_id)
+        return
+
+    if is_instagram_url(url):
+        try:
+            await process_download(client, query, mode, original_msg_id, url, 'all')
+        finally:
+            processing_callbacks.discard(original_msg_id)
+        return
+
     try:
-        video_metadata = await asyncio.to_thread(
-            download_video_sync, url, file_prefix_path, original_msg_id, active_downloads
+        try:
+            cached = entry_cache.get(original_msg_id)
+            if cached:
+                entries = cached['entries']
+            else:
+                await query.message.edit_text("🔎 正在检测此链接包含的视频数量...")
+                entries = await asyncio.to_thread(probe_video_entries, url)
+                entry_cache[original_msg_id] = {
+                    'url': url,
+                    'mode': mode,
+                    'entries': entries,
+                    'entry_count': len(entries),
+                }
+        except Exception as e:
+            await query.message.edit_text(f"❌ 解析失败: {str(e)}")
+            url_cache.pop(original_msg_id, None)
+            entry_cache.pop(original_msg_id, None)
+            return
+
+        if len(entries) <= 1:
+            await process_download(client, query, mode, original_msg_id, url, 'all', entries)
+            return
+
+        await query.message.edit_text(
+            f"检测到此 Post 包含 {len(entries)} 个视频，请选择下载范围：",
+            reply_markup=build_entry_selection_keyboard(mode, original_msg_id, len(entries))
         )
-        
-        active_downloads.pop(original_msg_id, None)
-        dl_task.cancel()
-        
-        if not os.path.exists(expected_file_name):
-            raise Exception("yt-dlp 下载完成，但硬盘未找到文件。")
-
-        if mode == 'video':
-            codec = await video_codec(expected_file_name)
-            
-            # 如果查出是 Telegram 不支持的 vp9 或 av1 (YouTube 常用)
-            if codec in ['vp9', 'vp09', 'av1', 'av01']:
-                await query.message.edit_text("⚙️ 检测到不受支持的视频编码 (VP9/AV1)\n正在自动转码为 H.264，这可能需要几分钟，请耐心等待...")
-                
-                transcoded_file = f"{file_prefix_path}_h264.mp4"
-                
-                # 呼叫 FFmpeg 进行转码
-                ffmpeg_cmd = [
-                    'ffmpeg', '-y', '-i', expected_file_name,
-                    '-c:v', 'libx264', 
-                    '-preset', 'veryslow',
-                    '-crf', '22',
-                    '-c:a', 'aac',
-                    '-b:a', '320k',
-                    transcoded_file
-                ]
-                
-                process = await asyncio.create_subprocess_exec(
-                    *ffmpeg_cmd,
-                    stdout=asyncio.subprocess.DEVNULL, # 隐藏控制台的刷屏日志
-                    stderr=asyncio.subprocess.DEVNULL
-                )
-                await process.wait() # 等待转码完成
-                
-                if process.returncode == 0 and os.path.exists(transcoded_file):
-                    # 转码成功，把新文件覆盖掉旧文件
-                    os.replace(transcoded_file, expected_file_name)
-                else:
-                    raise Exception("FFmpeg 转码过程发生错误。")
-
-        start_time = time.time()
-        state = {"last_update": 0}
-        
-        if mode == 'video':
-            await client.send_video(
-                chat_id=chat_id,
-                video=expected_file_name,
-                reply_to_message_id=original_msg_id,
-                caption="✅ Down! 请查收视频！",
-                supports_streaming=True,
-                width=video_metadata.get('width'),
-                height=video_metadata.get('height'),
-                duration=video_metadata.get('duration'),
-                progress=upload_progress,
-                progress_args=(query.message, start_time, state)
-            )
-        else:
-            await client.send_document(
-                chat_id=chat_id,
-                document=expected_file_name,
-                reply_to_message_id=original_msg_id,
-                caption="✅ Down! 请查收文件！",
-                progress=upload_progress,
-                progress_args=(query.message, start_time, state)
-            )
-            
-        await query.message.delete()
-
-    except Exception as e:
-        active_downloads.pop(original_msg_id, None)
-        if 'dl_task' in locals(): dl_task.cancel()
-        await query.message.edit_text(f"❌ 处理失败: {str(e)}")
-        
     finally:
-        url_cache.pop(original_msg_id, None)
-        if os.path.exists(expected_file_name):
-            os.remove(expected_file_name)
+        processing_callbacks.discard(original_msg_id)
 
 if __name__ == '__main__':
     print("Main Pyrogram Bot is starting...")
