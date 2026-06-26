@@ -64,7 +64,19 @@ TELEGRAM:
 
 SYSTEM:
   WORK_DIR: "YOUR_WORK_DIR_HERE" # Bot 的工作路径
-  COOKIE_FILE: "YOUR_COOKIE_FILE_NAME_HERE" # Cookie 文件名
+  COOKIE_FILE: "cookies.txt" # 兼容旧配置保留；新版 Cookie 管理由 COOKIES 控制
+
+COOKIES:
+  MODE: "file" # file | tokens | none
+  TOKEN_COOKIE_FILE: "generated.cookies.txt"
+  X_COOKIE_FILE: "x.cookies.txt"
+  INSTAGRAM_COOKIE_FILE: "instagram.cookies.txt"
+  UPLOAD_SESSION_TTL_SECONDS: 600
+  ADMIN_ALERT_COOLDOWN_SECONDS: 1800
+
+ADMIN:
+  USER_IDS:
+    - 123456789 # 允许管理 Cookie 的 Telegram 用户 ID
 
 # 以下为可选内容
 TOKENS: 
@@ -76,7 +88,17 @@ TOKENS:
 ```
 
 ### 5. 准备 Cookie (可选但推荐)
-为了能够正常下载部分限制级（NSFW）或需要登录才能查看的内容，请自行获取目标平台的 Cookie 填入配置文件的 Token 栏目中。
+为了能够正常下载部分限制级（NSFW）或需要登录才能查看的内容，推荐使用完整的 Netscape `cookies.txt` 文件：
+
+1. 在浏览器中登录 X 或 Instagram。
+2. 使用浏览器扩展导出 Netscape 格式的 `cookies.txt`。
+3. 启动机器人后，由 `ADMIN.USER_IDS` 中的管理员在私聊中发送：
+   - `/cookie_upload x`
+   - `/cookie_upload instagram`
+4. 在机器人提示的有效时间内，直接把对应平台的 `cookies.txt` 作为 Telegram 文件发送给机器人。
+5. 使用 `/cookie_status` 检查状态，必要时使用 `/reload_cookies` 重新加载。
+
+`TOKENS` 配置仍可作为兜底兼容，但不再推荐作为主要方式。下载失败且错误疑似为登录态失效时，机器人会自动私聊管理员提示更新 Cookie。
 
 ### 6. 启动机器人
 测试运行：
@@ -117,4 +139,3 @@ systemctl start bot
 
 ## 📄 开源协议 (License)
 本项目基于 [MIT License](LICENSE) 协议开源。
-

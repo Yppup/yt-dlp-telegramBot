@@ -5,7 +5,20 @@ TELEGRAM:
 
 SYSTEM:
   WORK_DIR: "YOUR_WORK_DIR_HERE"
-  COOKIE_FILE: "YOUR_COOKIE_FILE_NAME_HERE"
+  # 兼容旧配置保留；新版 Cookie 管理由 COOKIES 控制
+  COOKIE_FILE: "cookies.txt"
+
+COOKIES:
+  MODE: "file" # file | tokens | none
+  TOKEN_COOKIE_FILE: "generated.cookies.txt"
+  X_COOKIE_FILE: "x.cookies.txt"
+  INSTAGRAM_COOKIE_FILE: "instagram.cookies.txt"
+  UPLOAD_SESSION_TTL_SECONDS: 600
+  ADMIN_ALERT_COOLDOWN_SECONDS: 1800
+
+ADMIN:
+  USER_IDS:
+    - 123456789
 
 # 以下为可选内容
 TOKENS:

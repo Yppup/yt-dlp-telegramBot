@@ -4,12 +4,13 @@ import re
 import yaml
 import yt_dlp
 
+from cookie_manager import get_ydl_cookie_opts
+
 # --- 读取配置 ---
 with open("config.yaml", "r", encoding="utf-8") as f:
     config = yaml.safe_load(f)
 
 WORK_DIR = config['SYSTEM'].get('WORK_DIR','./')
-COOKIE_PATH = os.path.join(WORK_DIR, config['SYSTEM'].get('COOKIE_FILE','cookies.txt'))
 
 def _is_instagram_url(url):
     return 'instagram.com' in url
@@ -33,9 +34,9 @@ def probe_video_entries(url: str):
     ydl_opts = {
         'quiet': True,
         'no_warnings': True,
-        'cookiefile': COOKIE_PATH,
         'extract_flat': False,
     }
+    ydl_opts.update(get_ydl_cookie_opts(url))
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=False)
@@ -101,9 +102,9 @@ def download_video_sync(url: str, file_prefix_path: str, msg_id: int, active_dow
             'merge_output_format': 'mp4',
             'quiet': True,
             'no_warnings': True,
-            'cookiefile': COOKIE_PATH,
             'progress_hooks': [progress_hook],
         }
+        ydl_opts.update(get_ydl_cookie_opts(url))
 
         if total_count > 1:
             ydl_opts['playlist_items'] = str(entry_index)
